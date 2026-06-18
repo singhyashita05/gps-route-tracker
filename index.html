@@ -63,7 +63,30 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script>
+<script type="module">
+    import { initializeApp }
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+import {
+    getFirestore,
+    collection,
+    addDoc
+}
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBKNIYVwNW47b8s94I1xcTxKLwc9PNi344",
+  authDomain: "gps-route-tracker-e5ffa.firebaseapp.com",
+  projectId: "gps-route-tracker-e5ffa",
+  storageBucket: "gps-route-tracker-e5ffa.firebasestorage.app",
+  messagingSenderId: "391331164570",
+  appId: "1:391331164570:web:24db07d6bd89e825068a23",
+  measurementId: "G-SXM51YZMNG"
+};
+
+const app = initializeApp(firebaseConfig);
+
+const db = getFirestore(app);
 
 const map = L.map('map').setView([28.6139,77.2090],13);
 
@@ -178,6 +201,20 @@ document
             if(pathCoordinates.length === 0){
 
                 pathCoordinates.push(newPoint);
+                addDoc(
+    collection(db,"routes"),
+    {
+        latitude: lat,
+        longitude: lng,
+        timestamp: new Date().toISOString()
+    }
+)
+.then(() => {
+    console.log("Saved to Firestore");
+})
+.catch((error) => {
+    console.error(error);
+});
 
                 startMarker =
                     L.marker(newPoint)
