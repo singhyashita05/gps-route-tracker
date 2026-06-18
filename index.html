@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>GPS Route Tracker</title>
+
+```
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+    body{
+        margin:0;
+        padding:0;
+    }
+
+    #map{
+        height:100vh;
+        width:100%;
+    }
+
+    #controls{
+        position:absolute;
+        top:10px;
+        left:10px;
+        z-index:1000;
+        background:white;
+        padding:10px;
+        border-radius:8px;
+        box-shadow:0 0 10px rgba(0,0,0,0.2);
+    }
+
+    button{
+        margin:5px;
+        padding:8px 12px;
+        cursor:pointer;
+    }
+
+    #distance{
+        margin-top:10px;
+        font-weight:bold;
+    }
+</style>
+```
+
+</head>
+<body>
+
+<div id="controls">
+    <button id="startBtn">Start Tracking</button>
+    <button id="stopBtn">Stop Tracking</button>
+    <button id="clearBtn">Clear Route</button>
+
+```
+<div id="distance">
+    Distance: 0 m
+</div>
+```
+
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const map = L.map('map').setView([28.6139,77.2090],13);
+
+L.tileLayer(
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+        attribution:'&copy; OpenStreetMap contributors'
+    }
+).addTo(map);
+
+// =======================
+// LOAD SAVED DATA
+// =======================
+
+let pathCoordinates =
+    JSON.parse(localStorage.getItem("trackedRoute")) || [];
+
+let savedDistance =
+    parseFloat(localStorage.getItem("distance")) || 0;
+
+document.getElementById("distance").innerText =
+    `Distance: ${savedDistance.toFixed(2)} m`;
+
+let marker;
+let startMarker;
+let polyline;
+let watchId = null;
+
+// =======================
+// RESTORE SAVED ROUTE
+// =======================
+
+if(pathCoordinates.length > 0){
+
+    polyline = L.polyline(
+        pathCoordinates,
+        {
+            color:"blue",
+            weight:5
+        }
+    ).addTo(map);
+
+    startMarker = L.marker(pathCoordinates[0])
+        .addTo(map)
+        .bindPopup("Start Point");
+
+    map.fitBounds(polyline.getBounds());
+}
+
+// =======================
+// DISTANCE FUNCTION
+// =======================
+
+function calculateDistance(lat1,lon1,lat2,lon2){
+
+    const R = 6371000;
+
+    const dLat =
+        (lat2-lat1) * Math.PI/180;
+
+    const dLon =
+        (lon2-lon1) * Math.PI/180;
+
+    const a =
+        Math.sin(dLat/2) *
+        Math.sin(dLat/2)
+        +
+        Math.cos(lat1*Math.PI/180)
+        *
+        Math.cos(lat2*Math.PI/180)
+        *
+        Math.sin(dLon/2)
+        *
+        Math.sin(dLon/2);
+
+    const c =
+        2 * Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1-a)
+        );
+
+    return R*c;
+}
+
+// =======================
+// START TRACKING
+// =======================
+
+document
+.getElementById("startBtn")
+.addEventListener("click", ()=>{
+
+    if(watchId !== null){
+        return;
+    }
+
+    watchId =
+    navigator.geolocation.watchPosition(
+
+        function(position){
+
+            const lat =
+                position.coords.latitude;
+
+            const lng =
+                position.coords.longitude;
+
+            const newPoint =
+                [lat,lng];
+
+            // first point
+            if(pathCoordinates.length === 0){
+
+                pathCoordinates.push(newPoint);
+
+                startMarker =
+                    L.marker(newPoint)
+                    .addTo(map)
+                    .bindPopup("Start Point");
+
+                map.setView(newPoint,17);
+            }
+            else{
+
+                const lastPoint =
+                    pathCoordinates[
+                        pathCoordinates.length-1
+                    ];
+
+                const moved =
+                    calculateDistance(
+                        lastPoint[0],
+                        lastPoint[1],
+                        lat,
+                        lng
+                    );
+
+                // ignore GPS noise
+                if(moved < 10){
+                    return;
+                }
+
+                savedDistance += moved;
+
+                document
+                .getElementById("distance")
+                .innerText =
+                `Distance: ${savedDistance.toFixed(2)} m`;
+
+                localStorage.setItem(
+                    "distance",
+                    savedDistance
+                );
+
+                pathCoordinates.push(newPoint);
+            }
+
+            localStorage.setItem(
+                "trackedRoute",
+                JSON.stringify(pathCoordinates)
+            );
+
+            if(!marker){
+
+                marker =
+                    L.marker(newPoint)
+                    .addTo(map)
+                    .bindPopup("Current Location");
+            }
+
+            marker.setLatLng(newPoint);
+
+            if(polyline){
+                map.removeLayer(polyline);
+            }
+
+            polyline =
+                L.polyline(
+                    pathCoordinates,
+                    {
+                        color:"blue",
+                        weight:5
+                    }
+                ).addTo(map);
+
+        },
+
+        function(error){
+            console.log(error);
+        },
+
+        {
+            enableHighAccuracy:true,
+            maximumAge:0,
+            timeout:5000
+        }
+    );
+
+});
+
+// =======================
+// STOP TRACKING
+// =======================
+
+document
+.getElementById("stopBtn")
+.addEventListener("click", ()=>{
+
+    if(watchId !== null){
+
+        navigator.geolocation.clearWatch(
+            watchId
+        );
+
+        watchId = null;
+
+        alert("Tracking Stopped");
+    }
+});
+
+// =======================
+// CLEAR ROUTE
+// =======================
+
+document
+.getElementById("clearBtn")
+.addEventListener("click", ()=>{
+
+    localStorage.removeItem(
+        "trackedRoute"
+    );
+
+    localStorage.removeItem(
+        "distance"
+    );
+
+    location.reload();
+});
+
+</script>
+
+</body>
+</html>
