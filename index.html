@@ -4,7 +4,6 @@
 <head>
     <title>GPS Route Tracker</title>
 
-```
 <link rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -41,7 +40,7 @@
         font-weight:bold;
     }
 </style>
-```
+
 
 </head>
 <body>
@@ -51,11 +50,11 @@
     <button id="stopBtn">Stop Tracking</button>
     <button id="clearBtn">Clear Route</button>
 
-```
+
 <div id="distance">
     Distance: 0 m
 </div>
-```
+
 
 </div>
 
@@ -70,7 +69,10 @@ from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import {
     getFirestore,
     collection,
-    addDoc
+    addDoc,
+    getDocs,
+    query,
+    orderBy
 }
 from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
@@ -87,6 +89,52 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const db = getFirestore(app);
+async function loadRouteFromFirebase() {
+
+    const q = query(
+        collection(db, "routes"),
+        orderBy("timestamp")
+    );
+
+    const snapshot = await getDocs(q);
+
+    const firebaseRoute = [];
+
+    snapshot.forEach((doc) => {
+
+        const data = doc.data();
+
+        firebaseRoute.push([
+            data.latitude,
+            data.longitude
+        ]);
+    });
+
+    if (firebaseRoute.length > 0) {
+
+        pathCoordinates = firebaseRoute;
+
+        if (polyline) {
+            map.removeLayer(polyline);
+        }
+
+        polyline = L.polyline(
+            pathCoordinates,
+            {
+                color: "red",
+                weight: 5
+            }
+        ).addTo(map);
+
+        map.fitBounds(polyline.getBounds());
+
+        console.log(
+            "Loaded",
+            firebaseRoute.length,
+            "points from Firebase"
+        );
+    }
+}
 
 const map = L.map('map').setView([28.6139,77.2090],13);
 
@@ -114,6 +162,7 @@ let marker;
 let startMarker;
 let polyline;
 let watchId = null;
+loadRouteFromFirebase();
 
 // =======================
 // RESTORE SAVED ROUTE
@@ -136,9 +185,9 @@ if(pathCoordinates.length > 0){
     map.fitBounds(polyline.getBounds());
 }
 
-// =======================
+
 // DISTANCE FUNCTION
-// =======================
+
 
 function calculateDistance(lat1,lon1,lat2,lon2){
 
@@ -171,9 +220,8 @@ function calculateDistance(lat1,lon1,lat2,lon2){
     return R*c;
 }
 
-// =======================
 // START TRACKING
-// =======================
+
 
 document
 .getElementById("startBtn")
