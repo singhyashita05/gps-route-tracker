@@ -304,6 +304,20 @@ document
                 );
 
                 pathCoordinates.push(newPoint);
+                addDoc(
+    collection(db,"routes"),
+    {
+        latitude: lat,
+        longitude: lng,
+        timestamp: new Date().toISOString()
+    }
+)
+.then(() => {
+    console.log("Point saved");
+})
+.catch((error) => {
+    console.error(error);
+});
             }
 
             localStorage.setItem(
